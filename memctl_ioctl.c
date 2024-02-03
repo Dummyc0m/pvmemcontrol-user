@@ -86,8 +86,25 @@ int main() {
 				memctl_param.ret.ret_errno, memctl_param.ret.ret_code);
 		abort();
 	}
-
+	printf("the vma has been renamed kind 79\n");
 	getchar();
+
+	memset(&memctl_param, 0, sizeof(memctl_param));
+	memctl_param.call.addr = (__u64)arena_paddr;
+	memctl_param.call.func_code = MEMCTL_SET_VMA_ANON_NAME;
+	memctl_param.call.length = size;
+	memctl_param.call.arg = 0;
+	if (ioctl(memctl_fd, MEMCTL_IOCTL_VMM, &memctl_param) < 0) {
+		perror("ioctl");
+		abort();
+	}
+
+	if (memctl_param.ret.ret_errno || memctl_param.ret.ret_code) {
+		fprintf(stderr, "memctl error: errno %d, code %d",
+				memctl_param.ret.ret_errno, memctl_param.ret.ret_code);
+		abort();
+	}
+	printf("the vma has been renamed with null\n");
 
 	close(pagemap_fd);
 	close(memctl_fd);

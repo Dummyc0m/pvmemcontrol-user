@@ -3,15 +3,17 @@
  * Userspace interface for /dev/memctl - memctl Guest Memory Service Module
  *
  * Copyright (c) 2021, Google LLC.
+ * Yuanchu Xie <yuanchu@google.com>
  * Pasha Tatashin <pasha.tatashin@soleen.com>
  */
 
 #ifndef _UAPI_MEMCTL_H
 #define _UAPI_MEMCTL_H
 
-#include <stdbool.h>
+#include <linux/wait.h>
 #include <linux/types.h>
 #include <asm/param.h>
+#include <stdbool.h>
 
 /* Contains the function code and arguments for specific function */
 struct memctl_vmm_call {
@@ -46,7 +48,7 @@ union memctl_vmm {
 	struct memctl_vmm_info	info;
 };
 
-/* must not be from the stack. caller should allocate with kzalloc */
+/* Must not be from the stack. caller should allocate with kzalloc */
 struct memctl_buf {
 	struct memctl_vmm_call req;
 	union memctl_vmm resp;
@@ -62,37 +64,25 @@ struct memctl_buf {
 /* Get memctl_vmm_info, addr, length, and arg are ignored */
 #define MEMCTL_INFO		0
 
-/* madvise() calls, arg is ignored, memctl_vmm_return is returned */
-#define MEMCTL_NORMAL		1 /* madvise(addr, len, MADV_NORMAL); */
-#define MEMCTL_RANDOM		2 /* madvise(addr, len, MADV_RANDOM); */
-#define MEMCTL_SEQUENTIAL	3 /* madvise(addr, len, MADV_SEQUENTIAL); */
-#define MEMCTL_WILLNEED		4 /* madvise(addr, len, MADV_MADV_WILLNEED); */
-#define MEMCTL_DONTNEED		5 /* madvise(addr, len, MADV_DONTNEED); */
-#define MEMCTL_REMOVE		6 /* madvise(addr, len, MADV_MADV_REMOVE); */
-#define MEMCTL_HWPOISON		7 /* madvise(addr, len, MADV_HWPOISON); */
-#define MEMCTL_MERGEABLE	8 /* madvise(addr, len, MADV_MADV_MERGEABL); */
-#define MEMCTL_UNMERGEABLE	9 /* madvise(addr, len, MADV_UNMERGEABLE); */
-#define MEMCTL_SOFT_OFFLINE	10 /* madvise(addr, len, MADV_SOFT_OFFLINE); */
-#define MEMCTL_HUGEPAGE		11 /* madvise(addr, len, MADV_MADV_HUGEPAGE); */
-#define MEMCTL_NOHUGEPAGE	12 /* madvise(addr, len, MADV_NOHUGEPAGE); */
-#define MEMCTL_DONTDUMP		13 /* madvise(addr, len, MADV_DONTDUMP); */
-#define MEMCTL_DODUMP		14 /* madvise(addr, len, MADV_DODUMP); */
-#define MEMCTL_FREE		15 /* madvise(addr, len, MADV_FREE); */
+/* Memctl calls, memctl_vmm_return is returned */
+#define MEMCTL_DONTNEED		1 /* madvise(addr, len, MADV_DONTNEED); */
+#define MEMCTL_REMOVE		2 /* madvise(addr, len, MADV_MADV_REMOVE); */
+#define MEMCTL_FREE		3 /* madvise(addr, len, MADV_FREE); */
+#define MEMCTL_PAGEOUT		4 /* madvise(addr, len, MADV_PAGEOUT); */
 
-#define MEMCTL_MLOCK		16 /* mlock2(addr, len, 0) */
-#define MEMCTL_MLOCK_ONFAULT	17 /* mlock2(addr, len, MLOCK_ONFAULT) */
-#define MEMCTL_MUNLOCK		18 /* munlock(addr, len) */
+#define MEMCTL_UNMERGEABLE	5 /* madvise(addr, len, MADV_UNMERGEABLE); */
+#define MEMCTL_DONTDUMP		6 /* madvise(addr, len, MADV_DONTDUMP); */
 
-#define MEMCTL_MPROTECT_NONE	19 /* mprotect(addr, len, PROT_NONE) */
+#define MEMCTL_MLOCK		7 /* mlock2(addr, len, 0) */
+#define MEMCTL_MUNLOCK		8 /* munlock(addr, len) */
 
-#define MEMCTL_MPROTECT_R	20 /* mprotect(addr, len, PROT_READ) */
-#define MEMCTL_MPROTECT_W	21 /* mprotect(addr, len, PROT_WRITE) */
-
+#define MEMCTL_MPROTECT_NONE	9 /* mprotect(addr, len, PROT_NONE) */
+#define MEMCTL_MPROTECT_R	10 /* mprotect(addr, len, PROT_READ) */
+#define MEMCTL_MPROTECT_W	11 /* mprotect(addr, len, PROT_WRITE) */
 /* mprotect(addr, len, PROT_READ | PROT_WRITE) */
-#define MEMCTL_MPROTECT_RW	22
+#define MEMCTL_MPROTECT_RW	12
 
 /* prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, addr, len, arg) */
-#define MEMCTL_SET_VMA_ANON_NAME 23
+#define MEMCTL_SET_VMA_ANON_NAME 13
 
 #endif /* _UAPI_MEMCTL_H */
-
