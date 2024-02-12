@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdint.h>
+#include <errno.h>
 
 #include "memctl.h"
 
@@ -33,80 +35,82 @@ int pagemap_get_entry(int pagemap_fd, uintptr_t vaddr, uintptr_t *paddr)
 	return 0;
 }
 
-int main() {
-	int memctl_fd = open("/dev/memctl", O_RDWR);
-	if (memctl_fd < 0) {
-		perror("memctl open");
-		abort();
-	}
+uint64_t time_us(void) {
+  struct timespec ts;
+  int err = clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+  if (err == -1) {
+    perror("time");
+    abort();
+  }
+  return ((uint64_t)ts.tv_sec) * 1000000 + ((uint64_t)ts.tv_nsec) / 1000;
+}
 
-	size_t size = 1024 * 1024 * 1024;
-	int flags = MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE;
-	void *arena = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, -1, 0);
+int main(void) {
+  int memctl_fd = open("/dev/memctl", O_RDWR);
+  if (memctl_fd < 0) {
+    perror("memctl open");
+    abort();
+  }
 
-	memset(arena, 1, size);
+  size_t size = 1024 * 1024 * 1024;
+  int flags = MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE;
+  void *arena = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, -1, 0);
 
-	if (arena == MAP_FAILED) {
-		perror("mmap");
-		abort();
-	}
+  if (arena == MAP_FAILED) {
+    perror("mmap");
+    abort();
+  }
 
-	int pagemap_fd = open("/proc/self/pagemap", O_RDONLY);
-	if (pagemap_fd < 0) {
-		perror("pagemap open");
-		abort();
-	}
+  memset(arena, 1, size);
 
-	uintptr_t arena_paddr;
-	int err = pagemap_get_entry(pagemap_fd, (uintptr_t) arena, &arena_paddr);
-	if (err) {
-		abort();
-	}
+  int pagemap_fd = open("/proc/self/pagemap", O_RDONLY);
+  if (pagemap_fd < 0) {
+    perror("pagemap open");
+    abort();
+  }
 
-	if (arena_paddr == 0) {
-		fprintf(stderr, "/proc/self/pagemap read error\n");
-		abort();
-	}
+  uintptr_t arena_paddr;
+  int err = pagemap_get_entry(pagemap_fd, (uintptr_t)arena, &arena_paddr);
+  if (err) {
+    abort();
+  }
 
-	union memctl_vmm memctl_param;
+  if (arena_paddr == 0) {
+    fprintf(stderr, "/proc/self/pagemap read error\n");
+    abort();
+  }
 
-	memset(&memctl_param, 0, sizeof(memctl_param));
-	memctl_param.call.addr = (__u64)arena_paddr;
-	memctl_param.call.func_code = MEMCTL_SET_VMA_ANON_NAME;
-	memctl_param.call.length = size;
-	memctl_param.call.arg = 79;
+  union memctl_vmm memctl_param;
 
-	if (ioctl(memctl_fd, MEMCTL_IOCTL_VMM, &memctl_param) < 0) {
-		perror("ioctl");
-		abort();
-	}
+  uint64_t total_time = 0;
+  for (int i = 0; i < 100; ++i) {
+    memset(arena, 1, size);
 
-	if (memctl_param.ret.ret_errno || memctl_param.ret.ret_code) {
-		fprintf(stderr, "memctl error: errno %d, code %d",
-				memctl_param.ret.ret_errno, memctl_param.ret.ret_code);
-		abort();
-	}
-	printf("the vma has been renamed kind 79\n");
-	getchar();
+    memset(&memctl_param, 0, sizeof(memctl_param));
+    memctl_param.call.addr = (__u64)arena_paddr;
+    memctl_param.call.func_code = MEMCTL_DONTNEED;
+    memctl_param.call.length = size;
+    memctl_param.call.arg = 0;
 
-	memset(&memctl_param, 0, sizeof(memctl_param));
-	memctl_param.call.addr = (__u64)arena_paddr;
-	memctl_param.call.func_code = MEMCTL_SET_VMA_ANON_NAME;
-	memctl_param.call.length = size;
-	memctl_param.call.arg = 0;
-	if (ioctl(memctl_fd, MEMCTL_IOCTL_VMM, &memctl_param) < 0) {
-		perror("ioctl");
-		abort();
-	}
+    uint64_t time_elapsed = -time_us();
+    if (ioctl(memctl_fd, MEMCTL_IOCTL_VMM, &memctl_param) < 0) {
+      perror("ioctl");
+      abort();
+    }
+    time_elapsed += time_us();
 
-	if (memctl_param.ret.ret_errno || memctl_param.ret.ret_code) {
-		fprintf(stderr, "memctl error: errno %d, code %d",
-				memctl_param.ret.ret_errno, memctl_param.ret.ret_code);
-		abort();
-	}
-	printf("the vma has been renamed with null\n");
+    if (memctl_param.ret.ret_errno || memctl_param.ret.ret_code) {
+      fprintf(stderr, "memctl error: errno %d, code %d",
+              memctl_param.ret.ret_errno, memctl_param.ret.ret_code);
+      abort();
+    }
 
-	close(pagemap_fd);
-	close(memctl_fd);
-	return 0;
+    printf("run %d, %lu\n", i, time_elapsed);
+    total_time += time_elapsed;
+  }
+  printf("average time %lu us\n", total_time / 100);
+
+  close(pagemap_fd);
+  close(memctl_fd);
+  return 0;
 }
