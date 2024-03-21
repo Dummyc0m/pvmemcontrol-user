@@ -14,11 +14,10 @@
 
 int pagemap_get_entry(int pagemap_fd, uintptr_t vaddr, uintptr_t *paddr)
 {
-	size_t nread;
+	size_t nread = 0;
 	ssize_t ret;
 	uint64_t data;
 
-	nread = 0;
 	while (nread < sizeof(data)) {
 		ret = pread(pagemap_fd, ((uint8_t *)&data) + nread, sizeof(data) - nread,
 				(vaddr / getpagesize()) * sizeof(data) + nread);
@@ -28,11 +27,40 @@ int pagemap_get_entry(int pagemap_fd, uintptr_t vaddr, uintptr_t *paddr)
 			return ret;
 		}
 	}
+
 	printf("vaddr %lx\n", vaddr);
 	printf("converted data %lx\n", data);
-	*paddr = (data & (((uint64_t)1 << 55) - 1)) << 9;
+
+	if (!(data & (1ULL << 63))) { // Check if page is present
+		fprintf(stderr, "Page not present\n");
+		return -1;
+	}
+
+	*paddr = (data & (((uint64_t)1 << 54) - 1)) * getpagesize();
 	printf("converted paddr %lx\n", *paddr);
 	return 0;
+}
+
+int get_physical_address(int fd, uintptr_t virtual_address, uintptr_t *paddr) {
+    uint64_t offset = ((uintptr_t)virtual_address / getpagesize()) * 8; // 64-bit pagemap entries
+    uint64_t pagemap_entry;
+
+    if (pread(fd, &pagemap_entry, 8, offset) != 8) { 
+        perror("pread");
+        return -1;
+    }
+
+    if (!(pagemap_entry & (1ULL << 63))) { // Check if page is present
+        fprintf(stderr, "Page not present\n");
+        return -1;
+    }
+
+    uint64_t page_frame_number = pagemap_entry & ((1ULL << 54) - 1); // Mask out PFN
+    uint64_t physical_address = page_frame_number * getpagesize() + 
+                                ((uintptr_t)virtual_address % getpagesize());
+
+    *paddr = physical_address;
+    return 0;
 }
 
 uint64_t time_us(void) {
@@ -110,7 +138,9 @@ int main(void) {
   }
   printf("average time %lu us\n", total_time / 100);
 
+
   close(pagemap_fd);
   close(memctl_fd);
+  getchar();
   return 0;
 }
