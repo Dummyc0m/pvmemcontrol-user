@@ -1,13 +1,11 @@
-# Example program using memctl
+# Example program using pvmemcontrol
 
 ## Prerequisite
-- Guest kernel with memctl support
-- Cloud Hypervisor build with memctl support
+- Guest Linux kernel with pvmemcontrol support
+- Cloud Hypervisor with pvmemcontrol support
 
 ## Usage
-Enable memctl in Cloud Hypervisor with `--memctl`, and reserve at least one 1GB hugepage with `hugepagesz=1G hugepages=1 default_hugepagesz=1G`.
+Enable pvmemcontrol in Cloud Hypervisor with `--pvmemcontrol`, and reserve at least one 1GB hugepage with `hugepagesz=1G hugepages=1 default_hugepagesz=1G`.
 
-Within the guest, run `memctl_dev.sh` to mount the memctl chardev for the userspace interface.
-
-Run the `memctl_ioctl` binary to perform PR_SET_ANON_VMA_NAME on a hugetlb page, visible in the host via /proc/pid/smaps.
+Run the `pvmemcontrol_ioctl` binary to perform PVMEMCONTROL_DONTNEED (MADV_DONTNEED) on a hugetlb page. The change in memory usage is visible in the host via /proc/pid/smaps.
 
