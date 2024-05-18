@@ -1,5 +1,5 @@
 # Define the target executable name
-TARGET = memctl_ioctl
+TARGET = pvmemcontrol_ioctl
 
 # Define the C compiler
 CC = clang
