@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <errno.h>
 
-#include "memctl.h"
+#include "pvmemcontrol.h"
 
 int pagemap_get_entry(int pagemap_fd, uintptr_t vaddr, uintptr_t *paddr)
 {
@@ -74,9 +74,9 @@ uint64_t time_us(void) {
 }
 
 int main(void) {
-  int memctl_fd = open("/dev/memctl", O_RDWR);
-  if (memctl_fd < 0) {
-    perror("memctl open");
+  int pvmemcontrol_fd = open("/dev/pvmemcontrol", O_RDWR);
+  if (pvmemcontrol_fd < 0) {
+    perror("pvmemcontrol open");
     abort();
   }
 
@@ -108,28 +108,28 @@ int main(void) {
     abort();
   }
 
-  union memctl_vmm memctl_param;
+  struct pvmemcontrol_buf pvmemcontrol_param;
 
   uint64_t total_time = 0;
   for (int i = 0; i < 100; ++i) {
     memset(arena, 1, size);
 
-    memset(&memctl_param, 0, sizeof(memctl_param));
-    memctl_param.call.addr = (__u64)arena_paddr;
-    memctl_param.call.func_code = MEMCTL_DONTNEED;
-    memctl_param.call.length = size;
-    memctl_param.call.arg = 0;
+    memset(&pvmemcontrol_param, 0, sizeof(pvmemcontrol_param));
+    pvmemcontrol_param.call.addr = (__u64)arena_paddr;
+    pvmemcontrol_param.call.func_code = PVMEMCONTROL_DONTNEED;
+    pvmemcontrol_param.call.length = size;
+    pvmemcontrol_param.call.arg = 0;
 
     uint64_t time_elapsed = -time_us();
-    if (ioctl(memctl_fd, MEMCTL_IOCTL_VMM, &memctl_param) < 0) {
+    if (ioctl(pvmemcontrol_fd, PVMEMCONTROL_IOCTL_VMM, &pvmemcontrol_param) < 0) {
       perror("ioctl");
       abort();
     }
     time_elapsed += time_us();
 
-    if (memctl_param.ret.ret_errno || memctl_param.ret.ret_code) {
-      fprintf(stderr, "memctl error: errno %d, code %d",
-              memctl_param.ret.ret_errno, memctl_param.ret.ret_code);
+    if (pvmemcontrol_param.ret.ret_errno || pvmemcontrol_param.ret.ret_code) {
+      fprintf(stderr, "pvmemcontrol error: errno %d, code %d",
+              pvmemcontrol_param.ret.ret_errno, pvmemcontrol_param.ret.ret_code);
       abort();
     }
 
@@ -140,7 +140,7 @@ int main(void) {
 
 
   close(pagemap_fd);
-  close(memctl_fd);
+  close(pvmemcontrol_fd);
   getchar();
   return 0;
 }
