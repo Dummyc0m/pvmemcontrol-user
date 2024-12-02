@@ -12,6 +12,24 @@
 
 #include "pvmemcontrol.h"
 
+static void memset_volatile(volatile void *s, char c, size_t n)
+{
+    volatile char *p = s;
+    while (n-- > 0) {
+        *p++ = c;
+    }
+}
+
+static void assert_char(volatile void *s, char c, size_t n)
+{
+    volatile char *p = s;
+    while (n-- > 0) {
+        if (*p != c)
+					printf("error 0x%p is not 0x%x\n", p, c);
+				p++;
+    }
+}
+
 int pagemap_get_entry(int pagemap_fd, uintptr_t vaddr, uintptr_t *paddr)
 {
 	size_t nread = 0;
@@ -74,22 +92,22 @@ uint64_t time_us(void) {
 }
 
 int main(void) {
-  int pvmemcontrol_fd = open("/dev/pvmemcontrol", O_RDWR);
+  int pvmemcontrol_fd = open("/dev/pvmemcontrol0", O_RDWR);
   if (pvmemcontrol_fd < 0) {
     perror("pvmemcontrol open");
     abort();
   }
 
-  size_t size = 1024 * 1024 * 1024;
+  size_t size = 1UL * 1024 * 1024 * 1024;
   int flags = MAP_ANONYMOUS | MAP_HUGETLB | MAP_PRIVATE;
-  void *arena = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, -1, 0);
+  volatile void *arena = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, -1, 0);
 
   if (arena == MAP_FAILED) {
     perror("mmap");
     abort();
   }
 
-  memset(arena, 1, size);
+  memset_volatile(arena, 0, size);
 
   int pagemap_fd = open("/proc/self/pagemap", O_RDONLY);
   if (pagemap_fd < 0) {
@@ -107,24 +125,28 @@ int main(void) {
     fprintf(stderr, "/proc/self/pagemap read error\n");
     abort();
   }
-
   struct pvmemcontrol_buf pvmemcontrol_param;
 
   uint64_t total_time = 0;
   for (int i = 0; i < 100; ++i) {
-    memset(arena, 1, size);
+    assert_char(arena, 0, size);
+    memset_volatile(arena, 1, size);
+    assert_char(arena, 1, size);
 
-    memset(&pvmemcontrol_param, 0, sizeof(pvmemcontrol_param));
+    memset_volatile(&pvmemcontrol_param, 0, sizeof(pvmemcontrol_param));
     pvmemcontrol_param.call.addr = (__u64)arena_paddr;
     pvmemcontrol_param.call.func_code = PVMEMCONTROL_DONTNEED;
+    /* pvmemcontrol_param.call.func_code = PVMEMCONTROL_SET_VMA_ANON_NAME; */
     pvmemcontrol_param.call.length = size;
     pvmemcontrol_param.call.arg = 0;
 
     uint64_t time_elapsed = -time_us();
+
     if (ioctl(pvmemcontrol_fd, PVMEMCONTROL_IOCTL_VMM, &pvmemcontrol_param) < 0) {
       perror("ioctl");
       abort();
     }
+
     time_elapsed += time_us();
 
     if (pvmemcontrol_param.ret.ret_errno || pvmemcontrol_param.ret.ret_code) {

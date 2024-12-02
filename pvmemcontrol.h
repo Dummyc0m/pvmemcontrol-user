@@ -55,20 +55,21 @@ struct pvmemcontrol_buf {
 #define PVMEMCONTROL_REMOVE		2 /* madvise(addr, len, MADV_MADV_REMOVE); */
 #define PVMEMCONTROL_FREE		3 /* madvise(addr, len, MADV_FREE); */
 #define PVMEMCONTROL_PAGEOUT		4 /* madvise(addr, len, MADV_PAGEOUT); */
+#define PVMEMCONTROL_DONTDUMP		5 /* madvise(addr, len, MADV_DONTDUMP); */
 
-#define PVMEMCONTROL_UNMERGEABLE	5 /* madvise(addr, len, MADV_UNMERGEABLE); */
-#define PVMEMCONTROL_DONTDUMP		6 /* madvise(addr, len, MADV_DONTDUMP); */
+/* prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, addr, len, arg) */
+#define PVMEMCONTROL_SET_VMA_ANON_NAME  6
 
 #define PVMEMCONTROL_MLOCK		7 /* mlock2(addr, len, 0) */
 #define PVMEMCONTROL_MUNLOCK		8 /* munlock(addr, len) */
 
 #define PVMEMCONTROL_MPROTECT_NONE	9 /* mprotect(addr, len, PROT_NONE) */
-#define PVMEMCONTROL_MPROTECT_R	10 /* mprotect(addr, len, PROT_READ) */
-#define PVMEMCONTROL_MPROTECT_W	11 /* mprotect(addr, len, PROT_WRITE) */
+#define PVMEMCONTROL_MPROTECT_R	       10 /* mprotect(addr, len, PROT_READ) */
+#define PVMEMCONTROL_MPROTECT_W	       11 /* mprotect(addr, len, PROT_WRITE) */
 /* mprotect(addr, len, PROT_READ | PROT_WRITE) */
-#define PVMEMCONTROL_MPROTECT_RW	12
+#define PVMEMCONTROL_MPROTECT_RW       12
 
-/* prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, addr, len, arg) */
-#define PVMEMCONTROL_SET_VMA_ANON_NAME 13
+#define PVMEMCONTROL_MERGEABLE         13 /* madvise(addr, len, MADV_MERGEABLE); */
+#define PVMEMCONTROL_UNMERGEABLE       14 /* madvise(addr, len, MADV_UNMERGEABLE); */
 
 #endif /* _UAPI_PVMEMCONTROL_H */
